@@ -2,7 +2,7 @@
 
 **AI-Assisted Cloud Deployment Orchestration Engine**
 
-CloudForge is a platform designed to reduce the infrastructure burden on developers by analyzing their application repositories and orchestrating the deployment process to AWS.
+CloudForge is a platform designed to reduce the infrastructure burden on developers by analyzing application repositories and progressively orchestrating their deployment to AWS.
 
 The goal is simple:
 
@@ -28,31 +28,33 @@ Amazon ECR
 Amazon ECS
 ```
 
-The deployment workflow will use explicit checkpoints and validation rather than blindly deploying generated infrastructure.
+The deployment workflow uses explicit checkpoints and validation rather than blindly deploying generated infrastructure.
 
-## Current Status
+---
 
-### Phase 1 — Repository Analysis ✅
+# Current Status
 
-The current implementation focuses exclusively on understanding an application repository.
+## Phase 1 — Repository Analysis ✅
 
-CloudForge can currently:
+Phase 1 understands what the developer has built.
 
-* Discover relevant repository files
-* Detect application services
-* Parse supported project manifests
-* Normalize dependencies
-* Detect languages, runtimes, and frameworks
-* Identify likely application entry points
-* Detect application ports
-* Identify environment variables without exposing secret values
-* Analyze existing Docker configuration
-* Detect external dependencies
-* Build evidence-based service relationships
-* Attach confidence and evidence to important inferences
-* Handle unknown and ambiguous repositories conservatively
+CloudForge currently:
 
-Currently validated against representative:
+* Discovers relevant repository files
+* Detects application services
+* Parses supported project manifests
+* Normalizes dependencies
+* Detects languages, runtimes, and frameworks
+* Identifies likely application entry points
+* Detects application ports
+* Identifies environment variables without exposing secret values
+* Analyzes existing Docker configuration
+* Detects external dependencies
+* Builds evidence-based service relationships
+* Attaches confidence and evidence to important inferences
+* Handles unknown and ambiguous repositories conservatively
+
+Validated against representative:
 
 * MERN applications
 * Python/FastAPI applications
@@ -63,100 +65,240 @@ Currently validated against representative:
 * Malformed manifests
 * Different environment-variable naming conventions
 
-## Technology Stack
+**Status: Complete**
 
-### Backend
+---
+
+## Phase 2 — Deployment Planning ✅
+
+Phase 2 converts the repository analysis into an **evidence-backed deployment plan**.
+
+It answers:
+
+> **"Given what the developer built, how should it be deployed?"**
+
+The planner determines:
+
+* Services that require deployment
+* Deployment type
+* Runtime and framework
+* Dependency installation strategy
+* Build strategy
+* Start command
+* Production serving strategy
+* Application ports
+* Required environment variables
+* External dependencies
+* Service relationships
+* Networking requirements
+* Container requirements
+* AWS ECR/ECS target
+* Assumptions
+* Warnings
+* Blockers
+* Deployment readiness
+
+The planner explicitly distinguishes:
+
+```text
+🟢 ready
+🟡 requires_confirmation
+🔴 blocked
+```
+
+CloudForge does not treat unknown information as ready-to-deploy information.
+
+For example, if a frontend's production serving strategy or port cannot be reliably determined, CloudForge reports:
+
+```text
+deployment_readiness: requires_confirmation
+deployment_ready: false
+```
+
+rather than silently guessing.
+
+### Phase 2 Scope
+
+Phase 2 is planning-only.
+
+It does **not**:
+
+* Generate Dockerfiles
+* Build Docker images
+* Execute Docker
+* Create ECR repositories
+* Create ECS services
+* Provision AWS infrastructure
+* Call AWS APIs
+* Deploy applications
+
+**Status: Complete**
+
+---
+
+# Architecture
+
+The current architecture separates repository intelligence from deployment planning:
+
+```text
+                Repository
+                    │
+                    ▼
+        ┌──────────────────────┐
+        │ Phase 1              │
+        │ Repository Analysis  │
+        └──────────┬───────────┘
+                   │
+                   ▼
+          Repository Model
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ Phase 2              │
+        │ Deployment Planning  │
+        └──────────┬───────────┘
+                   │
+                   ▼
+           Deployment Plan
+                   │
+                   ▼
+             Plan Validation
+                   │
+          ┌────────┼────────┐
+          ▼        ▼        ▼
+        READY    CONFIRM   BLOCKED
+```
+
+The architecture is designed to remain extensible as additional languages, frameworks, deployment strategies, and cloud capabilities are introduced.
+
+---
+
+# Development Phases
+
+### Phase 1 — Repository Analysis
+
+Understand what the developer built.
+
+**Completed ✅**
+
+### Phase 2 — Deployment Planning
+
+Determine how the application should be deployed and whether enough information exists to proceed safely.
+
+**Completed ✅**
+
+### Phase 3 — Containerization
+
+Convert validated deployment plans into production-ready container configurations and validate them.
+
+**Next ⏳**
+
+### Phase 4 — AWS Deployment
+
+Push validated container images to Amazon ECR and deploy services to Amazon ECS.
+
+**Planned**
+
+### Phase 5 — Agentic Orchestration
+
+Use LangGraph to coordinate analysis, planning, validation, checkpoints, retries, and controlled deployment execution.
+
+**Planned**
+
+### Phase 6 — Dashboard
+
+Provide a React dashboard with real-time deployment progress, execution states, validation results, and logs.
+
+**Planned**
+
+---
+
+# Technology Stack
+
+## Current
 
 * Python
 * FastAPI
 * Pydantic
+* Pytest
 
-### Planned Infrastructure
+## Infrastructure
 
 * Docker
 * AWS ECR
 * AWS ECS
 * Boto3
 
-### Planned Agentic Workflow
+## Agentic Workflow
 
 * LangGraph
 
-### Planned Frontend
+## Frontend
 
 * React
 * WebSockets
 
-## Architecture
+---
 
-The current repository-analysis architecture separates:
+# Reliability Principle
+
+CloudForge follows an evidence-first approach.
+
+> **A wrong infrastructure decision is worse than an explicit warning.**
+
+The system should prefer:
 
 ```text
-Repository Discovery
-        ↓
-Manifest Parsing
-        ↓
-Dependency Normalization
-        ↓
-Service Resolution
-        ↓
-Technology Detection
-        ↓
-Source Analysis
-        ↓
-Environment Analysis
-        ↓
-Docker Analysis
-        ↓
-External Dependency Analysis
-        ↓
-Relationship Analysis
-        ↓
-Structured Repository Model
+Known
+  ↓
+Evidence
+  ↓
+Decision
 ```
 
-The architecture is designed to be extensible so that additional languages, frameworks, manifest formats, and analysis capabilities can be added without rewriting the core analyzer.
+over:
 
-## Development Phases
+```text
+Assumption
+  ↓
+Guess
+  ↓
+Infrastructure change
+```
 
-### Phase 1 — Repository Analysis
+When information is insufficient, CloudForge should report uncertainty and require confirmation rather than silently inventing deployment configuration.
 
-Understand what the developer built. **Completed.**
+This principle becomes increasingly important as CloudForge moves from analysis into automated infrastructure execution.
 
-### Phase 2 — Deployment Planning
+---
 
-Convert repository analysis into an evidence-backed deployment plan.
+# Development Checkpoints
 
-### Phase 3 — Containerization
+The project uses Git checkpoints between major phases:
 
-Generate and validate Docker configurations and container images.
+```text
+phase-1-complete
+        ↓
+phase-2-complete
+        ↓
+phase-3-complete
+        ↓
+phase-4-complete
+```
 
-### Phase 4 — AWS Deployment
+This allows later development phases to build on a known-good foundation without destabilizing earlier functionality.
 
-Push images to Amazon ECR and deploy services to Amazon ECS.
+---
 
-### Phase 5 — Agentic Orchestration
+# Current Milestone
 
-Use LangGraph to coordinate analysis, planning, validation, retries, and deployment.
+```text
+Phase 1 — Repository Analysis       🔒 COMPLETE
+Phase 2 — Deployment Planning      🔒 COMPLETE
+Phase 3 — Containerization         ⏳ NEXT
+Phase 4 — AWS Deployment           ⏳
+Phase 5 — Agentic Orchestration    ⏳
+Phase 6 — Dashboard                ⏳
+```
 
-### Phase 6 — Dashboard
-
-Provide a React dashboard with real-time deployment progress and execution logs.
-
-## Development Principle
-
-CloudForge should prefer:
-
-**Evidence over assumptions.**
-
-When the repository does not provide enough information to make a reliable inference, CloudForge should report uncertainty rather than inventing a deployment decision.
-
-This principle is especially important because later phases will use the analysis results to make infrastructure decisions.
-
-## Current Phase
-
-**Phase 1 — Repository Analysis: Complete**
-
-The next milestone is:
-
-**Phase 2 — Deployment Planning**
+**Current next milestone: Phase 3 — Containerization**
