@@ -1,0 +1,15 @@
+[project]
+name = "cloudforge"
+version = "0.1.0"
+description = "CloudForge repository analysis engine"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111.0",
+  "pydantic>=2.7.0",
+  "pytest>=8.0.0",
+  "httpx>=0.27.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
