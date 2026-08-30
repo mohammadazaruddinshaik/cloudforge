@@ -1,61 +1,62 @@
 # CloudForge
 
-**AI-Assisted Cloud Deployment Orchestration Engine**
+**Cloud Deployment Orchestration Engine**
 
 CloudForge is a platform designed to reduce the infrastructure burden on developers by analyzing application repositories and progressively orchestrating their deployment to AWS.
 
 The goal is simple:
 
-> **Developers focus on building applications. CloudForge handles the infrastructure and deployment workflow.**
+> **Developers focus on building applications. CloudForge handles the analysis, planning, containerization, and deployment workflow.**
 
 ## Project Vision
 
-CloudForge takes a full-stack application repository and progressively transforms it into a deployable cloud application:
+CloudForge takes a full-stack application repository and progressively transforms it into a validated, deployable cloud application:
 
 ```text
 Application Repository
         ↓
-Repository Analysis
+Phase 1: Repository Analysis
         ↓
-Deployment Planning
+Phase 2: Deployment Planning
         ↓
-Containerization
+Phase 3.1: Containerization Planning
         ↓
-Validation
+Phase 3.2: Dockerfile Generation
         ↓
-Amazon ECR
+Phase 3.3: Docker Build & Runtime Validation
         ↓
-Amazon ECS
+Phase 4: AWS Deployment (ECR/ECS)
 ```
 
 The deployment workflow uses explicit checkpoints and validation rather than blindly deploying generated infrastructure.
 
 ---
 
-# Current Status
+# Implementation Status
 
-## Phase 1 — Repository Analysis ✅
+## Phase 1 — Repository Analysis ✅ COMPLETE
 
 Phase 1 understands what the developer has built.
 
-CloudForge currently:
+CloudForge analyzes repositories by:
 
-* Discovers relevant repository files
-* Detects application services
-* Parses supported project manifests
-* Normalizes dependencies
-* Detects languages, runtimes, and frameworks
-* Identifies likely application entry points
-* Detects application ports
-* Identifies environment variables without exposing secret values
-* Analyzes existing Docker configuration
-* Detects external dependencies
-* Builds evidence-based service relationships
-* Attaches confidence and evidence to important inferences
-* Handles unknown and ambiguous repositories conservatively
+* Discovering relevant repository files
+* Detecting application services
+* Parsing supported project manifests (package.json, pyproject.toml, requirements.txt, etc.)
+* Normalizing dependencies
+* Detecting languages, runtimes, and frameworks
+* Identifying likely application entry points
+* Detecting application ports from evidence
+* Identifying environment variables safely (without exposing secrets)
+* Analyzing existing Docker configuration
+* Detecting external dependencies
+* Building evidence-based service relationships
+* Attaching confidence scores and evidence to inferences
+* Handling unknown and ambiguous repositories conservatively
 
-Validated against representative:
+**Current support:** Representative Node.js and Python repository patterns. Analysis is intentionally evidence-driven rather than claiming universal ecosystem support.
 
+**Validated against:**
 * MERN applications
 * Python/FastAPI applications
 * Multi-manifest Python services
@@ -65,64 +66,43 @@ Validated against representative:
 * Malformed manifests
 * Different environment-variable naming conventions
 
-**Status: Complete**
-
 ---
 
-## Phase 2 — Deployment Planning ✅
+## Phase 2 — Deployment Planning ✅ COMPLETE
 
-Phase 2 converts the repository analysis into an **evidence-backed deployment plan**.
+Phase 2 converts repository analysis into an **evidence-backed deployment plan**.
 
-It answers:
+It answers: **"Given what the developer built, how should it be deployed?"**
 
-> **"Given what the developer built, how should it be deployed?"**
+CloudForge determines:
 
-The planner determines:
-
-* Services that require deployment
-* Deployment type
+* Services requiring deployment
+* Deployment type and strategy
 * Runtime and framework
-* Dependency installation strategy
-* Build strategy
+* Dependency installation command
+* Build command (when applicable)
 * Start command
-* Production serving strategy
-* Application ports
+* Production serving strategy (when detectable from evidence)
+* Application ports (when known)
 * Required environment variables
 * External dependencies
 * Service relationships
-* Networking requirements
 * Container requirements
 * AWS ECR/ECS target
-* Assumptions
-* Warnings
-* Blockers
-* Deployment readiness
+* Assumptions, warnings, and blockers
+* Deployment readiness state
 
-The planner explicitly distinguishes:
-
+**Readiness States:**
 ```text
-🟢 ready
-🟡 requires_confirmation
-🔴 blocked
+🟢 ready                    — Sufficient evidence; safe to proceed
+🟡 requires_confirmation    — Incomplete evidence; manual review needed
+🔴 blocked                  — Fatal issues; cannot proceed safely
 ```
 
-CloudForge does not treat unknown information as ready-to-deploy information.
+CloudForge does not treat unknown information as ready-to-deploy. For example, if a frontend's production serving strategy or port cannot be determined, it reports `requires_confirmation` rather than silently guessing.
 
-For example, if a frontend's production serving strategy or port cannot be reliably determined, CloudForge reports:
-
-```text
-deployment_readiness: requires_confirmation
-deployment_ready: false
-```
-
-rather than silently guessing.
-
-### Phase 2 Scope
-
-Phase 2 is planning-only.
-
-It does **not**:
-
+**Phase 2 Scope:**
+Phase 2 is planning-only. It does **not**:
 * Generate Dockerfiles
 * Build Docker images
 * Execute Docker
@@ -130,86 +110,221 @@ It does **not**:
 * Create ECS services
 * Provision AWS infrastructure
 * Call AWS APIs
-* Deploy applications
 
-**Status: Complete**
+---
+
+## Phase 3.1 — Containerization Planning ✅ COMPLETE
+
+Phase 3.1 converts the deployment plan into a containerization plan.
+
+CloudForge:
+
+* Determines container requirements from the deployment plan
+* Preserves runtime, build, and start commands
+* Determines build context
+* Preserves environment requirements
+* Maintains readiness and uncertainty states from Phase 2
+* Does not invent runtime versions, ports, or production serving strategies
+
+Output: A structured containerization plan ready for Dockerfile generation.
+
+---
+
+## Phase 3.2 — Dockerfile Generation ✅ COMPLETE
+
+Phase 3.2 deterministically generates Dockerfile content from the containerization plan.
+
+CloudForge:
+
+* Generates Dockerfile content from containerization plan
+* Separates dependency installation from build steps
+* Respects working directory and build context
+* Exposes ports only when known
+* Preserves unresolved serving strategies as comments or labels
+* Never embeds secrets in Dockerfiles
+* Does not use LLM/agents to generate content
+
+**Important:** Generated Dockerfiles are produced as structured output/content. This phase does not mean CloudForge has deployed anything.
+
+---
+
+## Phase 3.3 — Docker Build & Runtime Validation ✅ COMPLETE
+
+Phase 3.3 validates generated Dockerfiles through build and runtime testing.
+
+CloudForge implements:
+
+* Docker CLI abstraction layer
+* Docker image build validation
+* Container runtime startup validation
+* Build/runtime status separation
+* Log capture and analysis
+* Container cleanup (stop/remove)
+* Docker-unavailable graceful handling
+* Fake/injected Docker client testing (deterministic without real daemon)
+* Readiness-aware validation (respects Phase 3.1 readiness states)
+* Secret redaction in logs and output
+
+**Important:** 
+> Real Docker execution has not been validated in the current development environment because the Docker daemon was unavailable during testing. The implementation handles this condition gracefully and does not claim the MERN application was successfully built/run in Docker.
+
+The Phase 3.3 test suite uses injected FakeDockerClient for deterministic coverage independent of Docker daemon availability.
 
 ---
 
 # Architecture
 
-The current architecture separates repository intelligence from deployment planning:
+## Phase Pipeline
 
 ```text
-                Repository
-                    │
-                    ▼
-        ┌──────────────────────┐
-        │ Phase 1              │
-        │ Repository Analysis  │
-        └──────────┬───────────┘
-                   │
-                   ▼
-          Repository Model
-                   │
-                   ▼
-        ┌──────────────────────┐
-        │ Phase 2              │
-        │ Deployment Planning  │
-        └──────────┬───────────┘
-                   │
-                   ▼
-           Deployment Plan
-                   │
-                   ▼
-             Plan Validation
-                   │
-          ┌────────┼────────┐
-          ▼        ▼        ▼
-        READY    CONFIRM   BLOCKED
+Repository
+    ↓
+[Phase 1: Repository Analysis]
+    ↓ (analysis model)
+[Phase 2: Deployment Planning]
+    ↓ (deployment plan)
+[Phase 3.1: Containerization Planning]
+    ↓ (containerization plan)
+[Phase 3.2: Dockerfile Generation]
+    ↓ (dockerfile + content)
+[Phase 3.3: Docker Build & Runtime Validation]
+    ↓ (validation result)
+[Phase 4: AWS Deployment] (planned)
 ```
 
-The architecture is designed to remain extensible as additional languages, frameworks, deployment strategies, and cloud capabilities are introduced.
+## Source Structure
+
+```text
+app/
+├── analysis/              (Phase 1: Repository analysis)
+│   ├── repository.py
+│   ├── detectors/
+│   ├── parsers/
+│   ├── discovery/
+│   ├── docker/
+│   ├── environment/
+│   ├── external/
+│   ├── relationships/
+│   ├── services/
+│   └── source/
+├── planning/              (Phase 2: Deployment planning)
+│   ├── planner.py
+│   ├── models.py
+│   └── validators.py
+├── containerization/      (Phase 3: Containerization)
+│   ├── planner.py
+│   ├── dockerfile_generator.py
+│   ├── docker_client.py
+│   ├── docker_validator.py
+│   └── models.py
+├── api/                   (REST endpoints)
+│   └── routes/
+├── core/
+│   ├── configuration.py
+│   ├── exceptions.py
+│   └── registry.py
+└── main.py
+```
 
 ---
 
-# Development Phases
+# Example: MERN Fixture
 
-### Phase 1 — Repository Analysis
+CloudForge is tested against a representative MERN (MongoDB, Express, React, Node.js) application:
 
-Understand what the developer built.
+**Backend Service:**
+```
+Runtime:       Node.js
+Framework:     Express
+Entry Point:   server.js
+Port:          5000 (detected from source)
+Dependencies:  MongoDB (external)
+Status:        Containerization Ready ✓
+```
 
-**Completed ✅**
+**Frontend Service:**
+```
+Runtime:       Node.js
+Framework:     React
+Entry Point:   src/App.js
+Port:          Unknown (dev vs. production unclear)
+Serving:       Production strategy unresolved
+Status:        Requires Confirmation (needs port + serving strategy)
+```
 
-### Phase 2 — Deployment Planning
+CloudForge intentionally marks the frontend as `requires_confirmation` rather than:
+* Assuming Nginx as a proxy
+* Inventing a port number
+* Guessing a serving strategy
 
-Determine how the application should be deployed and whether enough information exists to proceed safely.
+This conservative approach prevents silent misconfigurations that could fail in production.
 
-**Completed ✅**
+---
 
-### Phase 3 — Containerization
+# Reliability Principles
 
-Convert validated deployment plans into production-ready container configurations and validate them.
+CloudForge follows these core principles:
 
-**Next ⏳**
+### 1. Evidence-First Analysis
+* Decisions are based on detected evidence, not assumptions
+* Confidence scores and evidence chains are preserved
+* Inferences are explicitly labeled as such
 
-### Phase 4 — AWS Deployment
+### 2. Conservative Unknown Handling
+* Unknown information is not treated as "ready to deploy"
+* Ambiguous cases report `requires_confirmation`
+* Developers make final deployment decisions
 
-Push validated container images to Amazon ECR and deploy services to Amazon ECS.
+### 3. Explicit Readiness States
+```text
+ready               → Sufficient evidence to proceed
+requires_confirmation → Manual review needed
+blocked             → Cannot proceed safely
+```
 
-**Planned**
+### 4. No Secret Exposure
+* Secrets are redacted during analysis
+* Secrets are not embedded in generated Dockerfiles
+* Secrets are redacted from logs and validation output
 
-### Phase 5 — Agentic Orchestration
+### 5. No Invented Infrastructure
+* Ports are not guessed
+* Runtime versions are not assumed
+* Production serving strategies are not invented
+* Service relationships are not speculated
 
-Use LangGraph to coordinate analysis, planning, validation, checkpoints, retries, and controlled deployment execution.
+### 6. Separation of Planning and Execution
+* Planning phases produce structured plans, not deployments
+* Validation is separate from execution
+* Plans can be reviewed before execution
 
-**Planned**
+### 7. Validation Before Deployment
+* Generated artifacts are validated before use
+* Build validation is separate from runtime validation
+* Cleanup is verified
 
-### Phase 6 — Dashboard
+---
 
-Provide a React dashboard with real-time deployment progress, execution states, validation results, and logs.
+# Testing
 
-**Planned**
+**Current Test Coverage:**
+```
+65 tests passing
+1 non-blocking warning (FastAPI/Starlette httpx deprecation)
+```
+
+**Test Coverage by Phase:**
+* Phase 1 — Repository Analysis: Parsing, detection, relationships
+* Phase 2 — Deployment Planning: Planning logic, readiness determination
+* Phase 3.1 — Containerization Planning: Containerization readiness
+* Phase 3.2 — Dockerfile Generation: Dockerfile content generation
+* Phase 3.3 — Docker Validation: Build validation, runtime validation, cleanup, secret redaction
+
+Tests use:
+* Fixtures for representative application structures
+* Fake/injected Docker clients for deterministic validation
+* No real Docker daemon requirement
+* No AWS credentials or API calls
 
 ---
 
@@ -217,58 +332,36 @@ Provide a React dashboard with real-time deployment progress, execution states, 
 
 ## Current
 
-* Python
-* FastAPI
-* Pydantic
-* Pytest
+* **Language:** Python 3.12+
+* **Web Framework:** FastAPI
+* **Validation:** Pydantic
+* **Testing:** Pytest
+* **Container:** Docker CLI abstraction
+* **Package Management:** Poetry (pyproject.toml)
 
-## Infrastructure
+## Planned
 
-* Docker
-* AWS ECR
-* AWS ECS
-* Boto3
-
-## Agentic Workflow
-
-* LangGraph
-
-## Frontend
-
-* React
-* WebSockets
+* **AWS Infrastructure:** Boto3, ECR, ECS
+* **Orchestration:** LangGraph
+* **Frontend:** React with WebSockets
+* **Real-time Updates:** WebSocket integration
 
 ---
 
-# Reliability Principle
+# Current Project Status
 
-CloudForge follows an evidence-first approach.
+| Phase | Name | Status |
+|-------|------|--------|
+| 1 | Repository Analysis | ✅ COMPLETE |
+| 2 | Deployment Planning | ✅ COMPLETE |
+| 3.1 | Containerization Planning | ✅ COMPLETE |
+| 3.2 | Dockerfile Generation | ✅ COMPLETE |
+| 3.3 | Docker Build & Runtime Validation | ✅ COMPLETE |
+| 4 | AWS Deployment (ECR/ECS) | ⏳ PLANNED |
+| 5 | Agentic Orchestration | ⏳ PLANNED |
+| 6 | Dashboard | ⏳ PLANNED |
 
-> **A wrong infrastructure decision is worse than an explicit warning.**
-
-The system should prefer:
-
-```text
-Known
-  ↓
-Evidence
-  ↓
-Decision
-```
-
-over:
-
-```text
-Assumption
-  ↓
-Guess
-  ↓
-Infrastructure change
-```
-
-When information is insufficient, CloudForge should report uncertainty and require confirmation rather than silently inventing deployment configuration.
-
-This principle becomes increasingly important as CloudForge moves from analysis into automated infrastructure execution.
+**Clarification:** AWS/ECR/ECS deployment has NOT been implemented yet. Phase 4 will handle this in future work.
 
 ---
 
@@ -283,22 +376,7 @@ phase-2-complete
         ↓
 phase-3-complete
         ↓
-phase-4-complete
+phase-4-complete (planned)
 ```
 
 This allows later development phases to build on a known-good foundation without destabilizing earlier functionality.
-
----
-
-# Current Milestone
-
-```text
-Phase 1 — Repository Analysis       🔒 COMPLETE
-Phase 2 — Deployment Planning      🔒 COMPLETE
-Phase 3 — Containerization         ⏳ NEXT
-Phase 4 — AWS Deployment           ⏳
-Phase 5 — Agentic Orchestration    ⏳
-Phase 6 — Dashboard                ⏳
-```
-
-**Current next milestone: Phase 3 — Containerization**
